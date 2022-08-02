@@ -15,10 +15,9 @@ SNS_TOPIC = "Inspector-Finding-Delivery"
 DEST_EMAIL_ADDR = "changeme@example.com"
 
 # quick function to handle datetime serialization problems
-enco = lambda obj: (
-    obj.isoformat()
-    if isinstance(obj, datetime.datetime)
-    or isinstance(obj, datetime.date)
+enco = (
+    lambda obj: obj.isoformat()
+    if isinstance(obj, (datetime.datetime, datetime.date))
     else None
 )
 
@@ -32,9 +31,9 @@ def lambda_handler(event, context):
 
     # skip everything except report_finding notifications
     if notificationType != "FINDING_REPORTED":
-        print('Skipping notification that is not a new finding: ' + notificationType)
+        print(f'Skipping notification that is not a new finding: {notificationType}')
         return 1
-    
+
     # extract finding ARN
     findingArn = json.loads(message)['finding']
 
@@ -42,21 +41,21 @@ def lambda_handler(event, context):
     response = inspector.describe_findings(findingArns = [ findingArn ], locale='EN_US')
     print(response)
     finding = response['findings'][0]
-    
+
     # skip uninteresting findings
     title = finding['title']
     if title == "Unsupported Operating System or Version":
         print('Skipping finding: ', title)
         return 1
-        
+
     if title == "No potential security issues found":
         print('Skipping finding: ', title)
         return 1
-    
+
     # get the information to send via email
     subject = title[:100] # truncate @ 100 chars, SNS subject limit
     messageBody = "Title:\n" + title + "\n\nDescription:\n" + finding['description'] + "\n\nRecommendation:\n" + finding['recommendation']
-    
+
     # un-comment the following line to dump the entire finding as raw json
     # messageBody = json.dumps(finding, default=enco, indent=2)
 
@@ -69,7 +68,7 @@ def lambda_handler(event, context):
     response = sns.list_subscriptions_by_topic( TopicArn = snsTopicArn )
 
     nextPageToken = ""
-    
+
     # iterate through subscriptions array in paginated list API call
     while True:
         response = sns.list_subscriptions_by_topic(
@@ -81,13 +80,13 @@ def lambda_handler(event, context):
             if ( subscription['Endpoint'] == DEST_EMAIL_ADDR ):
                 subscribed = True
                 break
-        
+
         if 'NextToken' not in response:
             break
         else:
             nextPageToken = response['NextToken']
-       
-        
+
+
     # create subscription if necessary
     if ( subscribed == False ):
         response = sns.subscribe(
